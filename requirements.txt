@@ -1,4 +1,5 @@
 streamlit
+streamlit-cropper
 reportlab
 Pillow
 numpy
