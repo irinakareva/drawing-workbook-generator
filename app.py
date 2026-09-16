@@ -12,9 +12,10 @@ import streamlit as st
 from PIL import Image
 from streamlit_cropper import st_cropper
 
-from workbook_generator_backend import WorkbookBuilder
+from workbook_generator_backend_duplex_v2 import WorkbookBuilder, BACKEND_VERSION
 
 st.set_page_config(page_title="Drawing Workbook Generator", layout="wide")
+
 
 APP_ROOT = Path(tempfile.gettempdir()) / "drawing_workbook_generator_runs"
 APP_ROOT.mkdir(parents=True, exist_ok=True)
@@ -155,6 +156,7 @@ st.markdown(
 )
 
 st.title("Drawing Workbook Generator")
+st.caption(f"Generator backend: {BACKEND_VERSION}")
 st.write(
     "Drag and drop one or more reference images, optionally crop/frame each one, "
     "choose the exercises, and generate printable black-and-white PDF workbooks."

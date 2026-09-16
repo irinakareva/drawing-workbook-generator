@@ -126,7 +126,7 @@ This repository can also be deployed on Streamlit Community Cloud using `app.py`
 ## Repository files
 
 - `app.py` — Streamlit user interface
-- `workbook_generator_backend.py` — image processing and direct PDF generation
+- `workbook_generator_backend_duplex_v2.py` — image processing and direct PDF generation
 - `example_build.py` — small programmatic example
 - `requirements.txt` — Python dependencies
 - `assets/` — screenshots used in this README
@@ -142,3 +142,8 @@ The workbook process is intentionally repetitive. A learner can practice the **s
 - estimate page count before generating
 - per-image presets such as “simple object,” “organic form,” and “full study”
 - later: optional color-study exercises
+
+
+## Deployment note
+
+The current app imports the versioned backend `workbook_generator_backend_duplex_v2.py`. This avoids accidentally loading an older backend file that may still exist in a deployed repository. The app shows **Generator backend: duplex-v2** near the top when the update is active.
