@@ -2,6 +2,7 @@ import re
 import tempfile
 import zipfile
 import hashlib
+import base64
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -10,13 +11,98 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 from streamlit_cropper import st_cropper
-from streamlit_paste_button import paste_image_button
 
 from workbook_generator_backend import WorkbookBuilder
+
+st.set_page_config(page_title="Drawing Workbook Generator", layout="wide")
 
 APP_ROOT = Path(tempfile.gettempdir()) / "drawing_workbook_generator_runs"
 APP_ROOT.mkdir(parents=True, exist_ok=True)
 ASSET_DIR = Path(__file__).resolve().parent / "assets"
+
+
+PASTE_LISTENER_HTML = """
+<div id="paste-hint" tabindex="0">
+  <div class="paste-title">Paste a screenshot or copied image</div>
+  <div class="paste-subtitle"><strong>Ctrl+V</strong> anywhere on this page</div>
+</div>
+"""
+
+PASTE_LISTENER_CSS = """
+#paste-hint {
+  border: 1.5px dashed var(--st-border-color, #9aa0a6);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 2px 0 8px 0;
+  background: var(--st-secondary-background-color, #f6f7f8);
+  color: var(--st-text-color, #31333f);
+  font-family: var(--st-font, sans-serif);
+  cursor: default;
+  outline: none;
+}
+#paste-hint.paste-active {
+  border-color: var(--st-primary-color, #ff4b4b);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--st-primary-color, #ff4b4b) 22%, transparent);
+}
+.paste-title { font-weight: 600; margin-bottom: 2px; }
+.paste-subtitle { font-size: 0.88rem; opacity: 0.75; }
+"""
+
+PASTE_LISTENER_JS = r"""
+export default function(component) {
+  const { setTriggerValue, parentElement } = component;
+  const hint = parentElement.querySelector('#paste-hint');
+
+  const fileToPayload = (file, index) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({
+      name: file.name || `clipboard_${index + 1}.png`,
+      type: file.type || 'image/png',
+      data: reader.result,
+    });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const emitImages = async (files) => {
+    const images = Array.from(files || []).filter(
+      (file) => file && file.type && file.type.startsWith('image/')
+    );
+    if (!images.length) return;
+    try {
+      const payload = await Promise.all(images.map(fileToPayload));
+      hint?.classList.add('paste-active');
+      window.setTimeout(() => hint?.classList.remove('paste-active'), 500);
+      setTriggerValue('files', payload);
+    } catch (err) {
+      console.error('Could not read pasted image', err);
+    }
+  };
+
+  const onPaste = (event) => {
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageFiles = items
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+
+    // Ignore normal text paste. Intercept only clipboard content containing images.
+    if (!imageFiles.length) return;
+    event.preventDefault();
+    emitImages(imageFiles);
+  };
+
+  document.addEventListener('paste', onPaste, true);
+  return () => document.removeEventListener('paste', onPaste, true);
+}
+"""
+
+paste_listener_component = st.components.v2.component(
+    "drawing_workbook_clipboard_listener",
+    html=PASTE_LISTENER_HTML,
+    css=PASTE_LISTENER_CSS,
+    js=PASTE_LISTENER_JS,
+)
 
 
 @dataclass
@@ -50,8 +136,6 @@ def merged_suffix(specs):
         return "__".join(stems)
     return f"{len(stems)}_images"
 
-
-st.set_page_config(page_title="Drawing Workbook Generator", layout="wide")
 
 st.markdown(
     """
@@ -117,8 +201,8 @@ For supported exercises, the scaffold can fade **fine grid → medium grid → c
 **Image input**
 
 - File upload / drag-and-drop: **PNG, JPG/JPEG, WEBP**
-- Clipboard: paste a screenshot or copied image directly into the app; clipboard images are imported as PNG.
-- On Windows, **Win + Shift + S** puts a screen clipping on the clipboard, so it can be added without saving a file first.
+- Clipboard: press **Ctrl+V anywhere on the app page** after copying an image or taking a screenshot. Clipboard images are imported as PNG.
+- On Windows, **Win + Shift + S** puts a screen clipping on the clipboard, then return here and press **Ctrl+V**. No intermediate file save is needed.
         """
     )
 
@@ -138,7 +222,7 @@ output_mode = st.radio(
 
 st.subheader("Reference images")
 st.caption(
-    "Drag files into the box, browse for files, or paste a screenshot/image from your clipboard. "
+    "Drag files into the box, browse for files, or press Ctrl+V anywhere on this page to paste a screenshot/copied image. "
     "Supported files: PNG, JPG/JPEG, WEBP. Clipboard images are imported as PNG."
 )
 
@@ -152,21 +236,31 @@ uploaded_files = st.file_uploader(
 if "pasted_images" not in st.session_state:
     st.session_state.pasted_images = []
 
-paste_col, clear_col = st.columns([1, 1])
-with paste_col:
-    paste_result = paste_image_button(
-        label="Paste screenshot/image from clipboard",
-        key="clipboard_paste_button",
-        errors="raise",
-    )
+paste_result = paste_listener_component(
+    key="clipboard_paste_listener",
+    on_files_change=lambda: None,
+)
 
-if paste_result.image_data is not None:
-    buf = BytesIO()
-    paste_result.image_data.convert("RGB").save(buf, format="PNG")
-    img_bytes = buf.getvalue()
-    digest = hashlib.sha256(img_bytes).hexdigest()
+if getattr(paste_result, "files", None):
     known = {item["digest"] for item in st.session_state.pasted_images}
-    if digest not in known:
+    added = 0
+    for pasted in paste_result.files:
+        data_url = pasted.get("data", "")
+        if not data_url or "," not in data_url:
+            continue
+        try:
+            img_bytes = base64.b64decode(data_url.split(",", 1)[1])
+            # Normalize to PNG so downstream image handling is predictable.
+            image = Image.open(BytesIO(img_bytes)).convert("RGB")
+            buf = BytesIO()
+            image.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+        except Exception:
+            continue
+
+        digest = hashlib.sha256(img_bytes).hexdigest()
+        if digest in known:
+            continue
         n = len(st.session_state.pasted_images) + 1
         st.session_state.pasted_images.append(
             {
@@ -175,13 +269,20 @@ if paste_result.image_data is not None:
                 "digest": digest,
             }
         )
+        known.add(digest)
+        added += 1
+
+    if added:
         st.rerun()
 
-with clear_col:
-    if st.session_state.pasted_images:
+if st.session_state.pasted_images:
+    clear_col, status_col = st.columns([1, 2])
+    with clear_col:
         if st.button("Clear pasted images"):
             st.session_state.pasted_images = []
             st.rerun()
+    with status_col:
+        st.caption(f"{len(st.session_state.pasted_images)} clipboard image(s) added.")
 
 pasted_uploads = [
     MemoryImageUpload(name=item["name"], data=item["data"])
@@ -192,7 +293,7 @@ all_images = list(uploaded_files or []) + pasted_uploads
 if st.session_state.pasted_images:
     st.caption(
         f"{len(st.session_state.pasted_images)} clipboard image(s) added. "
-        "Copy another screenshot/image and click the paste button again to add more."
+        "Copy another screenshot/image and press Ctrl+V again to add more."
     )
 
 specs = []

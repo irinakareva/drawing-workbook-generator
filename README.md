@@ -42,9 +42,9 @@ Blind contour and regular contour are treated as observation exercises, so they 
 
 The app accepts **PNG, JPG/JPEG, and WEBP** files through drag-and-drop or the file browser.
 
-It also accepts images directly from the clipboard. On Windows, for example, use **Win + Shift + S** to make a screen clipping, then click **Paste screenshot/image from clipboard** in the app. The screenshot is imported as PNG, so it does not need to be saved as a file first. Multiple clipboard images can be added one after another.
+It also accepts images directly from the clipboard. Press **Ctrl+V anywhere on the app page** after copying an image. On Windows, use **Win + Shift + S** to make a screen clipping, return to the app, and press **Ctrl+V**. The screenshot is imported as PNG, so it never has to be saved as a file first. Multiple clipboard images can be pasted one after another.
 
-Clipboard access depends on the browser Clipboard API. Hosted Streamlit apps use HTTPS, which is the secure context browsers normally require for clipboard access.
+Normal text paste is left alone: the app only intercepts clipboard pastes that actually contain an image.
 
 ## Image framing
 
