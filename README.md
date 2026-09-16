@@ -42,9 +42,9 @@ Blind contour and regular contour are treated as observation exercises, so they 
 
 The app accepts **PNG, JPG/JPEG, and WEBP** files through drag-and-drop or the file browser.
 
-It also accepts images directly from the clipboard. Press **Ctrl+V anywhere on the app page** after copying an image. On Windows, use **Win + Shift + S** to make a screen clipping, return to the app, and press **Ctrl+V**. The screenshot is imported as PNG, so it never has to be saved as a file first. Multiple clipboard images can be pasted one after another.
+It also accepts images directly from the clipboard. On Windows, for example, use **Win + Shift + S** to make a screen clipping, then click **Paste screenshot/image from clipboard** in the app. The screenshot is imported as PNG, so it does not need to be saved as a file first. Multiple clipboard images can be added one after another.
 
-Normal text paste is left alone: the app only intercepts clipboard pastes that actually contain an image.
+Clipboard access depends on the browser Clipboard API. Hosted Streamlit apps use HTTPS, which is the secure context browsers normally require for clipboard access.
 
 ## Image framing
 
@@ -67,6 +67,15 @@ Output options:
 - **Both** — merged PDF plus separate PDFs
 
 Separate workbooks can also be downloaded together as a ZIP. Download names include the uploaded image filename so repeated generations are easier to distinguish.
+
+## Print layout
+
+The app supports two print layouts:
+
+- **Duplex - facing pages (recommended)** — larger exercises are arranged so the reference lands on the left page and the drawing page faces it on the right when printed double-sided.
+- **Single-sided / no duplex adjustments** — pages are generated in straightforward sequence without parity correction.
+
+For **progressive focus**, duplex mode uses a duplex-safe spread layout: each blur stage gets its own facing working page. This avoids having a reference printed on the back of a page you are meant to draw on. If you specifically want one single evolving physical drawing sheet, use the single-sided layout for that section or work on a separate loose sheet while using the printed reference pages.
 
 ## Output
 
@@ -105,18 +114,18 @@ python -m pip install -r requirements.txt
 ### 4. Run the app
 
 ```bat
-python -m streamlit run app.py
+python -m streamlit run workbook_generator_app.py
 ```
 
 The app should open automatically in your browser.
 
 ## Streamlit Cloud
 
-This repository can also be deployed on Streamlit Community Cloud using `app.py` as the entry point. Once deployed, pushing updates to the GitHub repository will trigger a redeploy automatically.
+This repository can also be deployed on Streamlit Community Cloud using `workbook_generator_app.py` as the entry point. Once deployed, pushing updates to the GitHub repository will trigger a redeploy automatically.
 
 ## Repository files
 
-- `app.py` — Streamlit user interface
+- `workbook_generator_app.py` — Streamlit user interface
 - `workbook_generator_backend.py` — image processing and direct PDF generation
 - `example_build.py` — small programmatic example
 - `requirements.txt` — Python dependencies
