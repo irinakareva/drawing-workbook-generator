@@ -1,6 +1,8 @@
 import re
 import tempfile
 import zipfile
+import hashlib
+from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -8,11 +10,29 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 from streamlit_cropper import st_cropper
+from streamlit_paste_button import paste_image_button
 
 from workbook_generator_backend import WorkbookBuilder
 
 APP_ROOT = Path(tempfile.gettempdir()) / "drawing_workbook_generator_runs"
 APP_ROOT.mkdir(parents=True, exist_ok=True)
+ASSET_DIR = Path(__file__).resolve().parent / "assets"
+
+
+@dataclass
+class MemoryImageUpload:
+    """Minimal UploadedFile-like wrapper for clipboard images."""
+    name: str
+    data: bytes
+
+    def getvalue(self):
+        return self.data
+
+
+def clipboard_upload_from_pil(image, name):
+    buf = BytesIO()
+    image.convert("RGB").save(buf, format="PNG")
+    return MemoryImageUpload(name=name, data=buf.getvalue())
 
 
 def slugify(text):
@@ -56,6 +76,56 @@ st.write(
     "choose the exercises, and generate printable black-and-white PDF workbooks."
 )
 
+with st.expander("About this tool"):
+    st.markdown(
+        """
+This tool turns a reference image into a **structured drawing-practice workbook** rather than asking you to jump straight from looking at an image to drawing it unsupported. The same perceptual skills can be repeated across different references while placement support fades gradually.
+
+**Typical exercise sequence**
+
+1. **Blind contour** — observation only; no grid.
+2. **Regular contour** — observed edges and major internal contours; no grid.
+3. **SAM / mapping** — sighting, angles, and mapping with scaffold support.
+4. **Upside-down drawing** — reduces object-labeling while keeping placement support.
+5. **Negative space** — draw the empty shapes around and between forms.
+6. **3-value study** — simplify to dark, middle, and light.
+7. **5-value study** — develop the value structure further.
+8. **Progressive focus** — build one drawing from very blurred to sharp references.
+9. **Integrated study** — bring the process together with only a light center-cross scaffold.
+
+For supported exercises, the scaffold can fade **fine grid → medium grid → coarse grid → center cross** instead of disappearing all at once. You can generate compact practice pages, larger studies, or both.
+        """
+    )
+
+    overview = ASSET_DIR / "app_overview.png"
+    contour = ASSET_DIR / "contour_example.jpg"
+    scaffold = ASSET_DIR / "scaffold_progression.jpg"
+
+    if overview.exists():
+        st.image(str(overview), caption="Workbook generator overview", use_container_width=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if contour.exists():
+            st.image(str(contour), caption="Contour exercises: observation without a grid", use_container_width=True)
+    with col2:
+        if scaffold.exists():
+            st.image(str(scaffold), caption="Placement support fades gradually", use_container_width=True)
+
+    st.markdown(
+        """
+**Image input**
+
+- File upload / drag-and-drop: **PNG, JPG/JPEG, WEBP**
+- Clipboard: paste a screenshot or copied image directly into the app; clipboard images are imported as PNG.
+- On Windows, **Win + Shift + S** puts a screen clipping on the clipboard, so it can be added without saving a file first.
+        """
+    )
+
+    st.markdown(
+        "[Full project details and setup instructions on GitHub](https://github.com/irinakareva/drawing-workbook-generator)"
+    )
+
 workbook_title = st.text_input("Workbook title", value="Custom Drawing Practice Workbook")
 include_compact = st.checkbox("Include compact pages", value=True)
 include_large = st.checkbox("Include large-study pages", value=True)
@@ -67,7 +137,11 @@ output_mode = st.radio(
 )
 
 st.subheader("Reference images")
-st.caption("Drag images into the box below, or click Browse files. You can add several images at once.")
+st.caption(
+    "Drag files into the box, browse for files, or paste a screenshot/image from your clipboard. "
+    "Supported files: PNG, JPG/JPEG, WEBP. Clipboard images are imported as PNG."
+)
+
 uploaded_files = st.file_uploader(
     "Drag and drop reference images here",
     type=["png", "jpg", "jpeg", "webp"],
@@ -75,10 +149,56 @@ uploaded_files = st.file_uploader(
     label_visibility="collapsed",
 )
 
+if "pasted_images" not in st.session_state:
+    st.session_state.pasted_images = []
+
+paste_col, clear_col = st.columns([1, 1])
+with paste_col:
+    paste_result = paste_image_button(
+        label="Paste screenshot/image from clipboard",
+        key="clipboard_paste_button",
+        errors="raise",
+    )
+
+if paste_result.image_data is not None:
+    buf = BytesIO()
+    paste_result.image_data.convert("RGB").save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    digest = hashlib.sha256(img_bytes).hexdigest()
+    known = {item["digest"] for item in st.session_state.pasted_images}
+    if digest not in known:
+        n = len(st.session_state.pasted_images) + 1
+        st.session_state.pasted_images.append(
+            {
+                "name": f"clipboard_{n:02d}.png",
+                "data": img_bytes,
+                "digest": digest,
+            }
+        )
+        st.rerun()
+
+with clear_col:
+    if st.session_state.pasted_images:
+        if st.button("Clear pasted images"):
+            st.session_state.pasted_images = []
+            st.rerun()
+
+pasted_uploads = [
+    MemoryImageUpload(name=item["name"], data=item["data"])
+    for item in st.session_state.pasted_images
+]
+all_images = list(uploaded_files or []) + pasted_uploads
+
+if st.session_state.pasted_images:
+    st.caption(
+        f"{len(st.session_state.pasted_images)} clipboard image(s) added. "
+        "Copy another screenshot/image and click the paste button again to add more."
+    )
+
 specs = []
-if uploaded_files:
+if all_images:
     st.subheader("Per-image settings")
-    for idx, up in enumerate(uploaded_files, start=1):
+    for idx, up in enumerate(all_images, start=1):
         with st.expander(f"Image {idx}: {up.name}", expanded=True):
             original_img = pil_from_upload(up)
 
@@ -194,7 +314,7 @@ if uploaded_files:
                 }
             )
 
-if uploaded_files and st.button("Generate workbook", type="primary"):
+if all_images and st.button("Generate workbook", type="primary"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     run_dir = APP_ROOT / timestamp
     upload_dir = run_dir / "uploads"

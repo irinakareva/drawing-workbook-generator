@@ -38,9 +38,17 @@ Blind contour and regular contour are treated as observation exercises, so they 
 
 ![Contour example](assets/contour_example.jpg)
 
+## Image input
+
+The app accepts **PNG, JPG/JPEG, and WEBP** files through drag-and-drop or the file browser.
+
+It also accepts images directly from the clipboard. On Windows, for example, use **Win + Shift + S** to make a screen clipping, then click **Paste screenshot/image from clipboard** in the app. The screenshot is imported as PNG, so it does not need to be saved as a file first. Multiple clipboard images can be added one after another.
+
+Clipboard access depends on the browser Clipboard API. Hosted Streamlit apps use HTTPS, which is the secure context browsers normally require for clipboard access.
+
 ## Image framing
 
-Each uploaded image can use one of three framing modes:
+Each reference image can use one of three framing modes:
 
 - **Auto frame** — trims obvious unused outer background before sizing the exercise boxes
 - **Crop manually** — interactive draggable/resizable crop box, with free or fixed aspect ratios
