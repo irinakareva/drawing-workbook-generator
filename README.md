@@ -42,9 +42,9 @@ Blind contour and regular contour are treated as observation exercises, so they 
 
 The app accepts **PNG, JPG/JPEG, and WEBP** files through drag-and-drop or the file browser.
 
-It also accepts images directly from the clipboard. On Windows, for example, use **Win + Shift + S** to make a screen clipping, then click **Paste screenshot/image from clipboard** in the app. The screenshot is imported as PNG, so it does not need to be saved as a file first. Multiple clipboard images can be added one after another.
+It also accepts images directly from the clipboard. Press **Ctrl+V anywhere on the app page** after copying an image. On Windows, use **Win + Shift + S** to make a screen clipping, return to the app, and press **Ctrl+V**. The screenshot is imported as PNG, so it never has to be saved as a file first. Multiple clipboard images can be pasted one after another.
 
-Clipboard access depends on the browser Clipboard API. Hosted Streamlit apps use HTTPS, which is the secure context browsers normally require for clipboard access.
+Normal text paste is left alone: the app only intercepts clipboard pastes that actually contain an image.
 
 ## Image framing
 
@@ -55,6 +55,15 @@ Each reference image can use one of three framing modes:
 - **Use full image exactly** — preserves the complete uploaded image and its existing whitespace
 
 A manually approved crop is used consistently for every derived exercise.
+
+## Printing layout
+
+The app has two print-layout modes:
+
+- **Duplex - facing pages** (recommended): designed for ordinary double-sided printing with **Flip on long edge**. Full-page references are forced onto even-numbered left pages and their matching drawing grids onto the following odd-numbered right pages, so they face each other rather than printing back-to-back. If page parity needs correcting, the generator inserts a simple extra-practice page instead of an empty page.
+- **Single-sided**: generates pages in normal sequence without duplex parity adjustments.
+
+For **Progressive focus**, duplex mode uses one efficient two-page spread: all four reference stages appear on the left page and one large evolving drawing grid is on the facing right page. This preserves the intended one-drawing exercise without putting a reference on the reverse of the drawing sheet.
 
 ## Multiple images and downloads
 
@@ -67,15 +76,6 @@ Output options:
 - **Both** — merged PDF plus separate PDFs
 
 Separate workbooks can also be downloaded together as a ZIP. Download names include the uploaded image filename so repeated generations are easier to distinguish.
-
-## Print layout
-
-The app supports two print layouts:
-
-- **Duplex - facing pages (recommended)** — larger exercises are arranged so the reference lands on the left page and the drawing page faces it on the right when printed double-sided.
-- **Single-sided / no duplex adjustments** — pages are generated in straightforward sequence without parity correction.
-
-For **progressive focus**, duplex mode uses a duplex-safe spread layout: each blur stage gets its own facing working page. This avoids having a reference printed on the back of a page you are meant to draw on. If you specifically want one single evolving physical drawing sheet, use the single-sided layout for that section or work on a separate loose sheet while using the printed reference pages.
 
 ## Output
 
@@ -114,18 +114,18 @@ python -m pip install -r requirements.txt
 ### 4. Run the app
 
 ```bat
-python -m streamlit run workbook_generator_app.py
+python -m streamlit run app.py
 ```
 
 The app should open automatically in your browser.
 
 ## Streamlit Cloud
 
-This repository can also be deployed on Streamlit Community Cloud using `workbook_generator_app.py` as the entry point. Once deployed, pushing updates to the GitHub repository will trigger a redeploy automatically.
+This repository can also be deployed on Streamlit Community Cloud using `app.py` as the entry point. Once deployed, pushing updates to the GitHub repository will trigger a redeploy automatically.
 
 ## Repository files
 
-- `workbook_generator_app.py` — Streamlit user interface
+- `app.py` — Streamlit user interface
 - `workbook_generator_backend.py` — image processing and direct PDF generation
 - `example_build.py` — small programmatic example
 - `requirements.txt` — Python dependencies

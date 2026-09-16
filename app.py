@@ -213,6 +213,16 @@ For supported exercises, the scaffold can fade **fine grid → medium grid → c
 workbook_title = st.text_input("Workbook title", value="Custom Drawing Practice Workbook")
 include_compact = st.checkbox("Include compact pages", value=True)
 include_large = st.checkbox("Include large-study pages", value=True)
+print_layout = st.radio(
+    "Print layout",
+    ["Duplex - facing pages", "Single-sided"],
+    index=0,
+    horizontal=True,
+    help=(
+        "Duplex mode arranges large references on left-hand pages and their drawing grids on the facing right-hand pages. "
+        "Print double-sided, flip on long edge. Progressive focus becomes one two-page spread: four reference stages on the left, one evolving drawing on the right."
+    ),
+)
 output_mode = st.radio(
     "Output",
     ["One merged workbook", "Separate workbook for each image", "Both"],
@@ -466,7 +476,7 @@ if all_images and st.button("Generate workbook", type="primary"):
         if output_mode in ["One merged workbook", "Both"]:
             merged_name = f"{slugify(workbook_title)}__merged__{merged_suffix(specs)}.pdf"
             merged_pdf_path = run_dir / merged_name
-            WorkbookBuilder(run_dir / "assets_merged").build(workbook_title, build_specs, merged_pdf_path)
+            WorkbookBuilder(run_dir / "assets_merged", print_layout="duplex_facing" if print_layout.startswith("Duplex") else "single_sided").build(workbook_title, build_specs, merged_pdf_path)
 
         if output_mode in ["Separate workbook for each image", "Both"]:
             for idx, (source_spec, build_spec) in enumerate(zip(specs, build_specs), start=1):
@@ -477,7 +487,7 @@ if all_images and st.button("Generate workbook", type="primary"):
                     name_bits.append(subject_stem)
                 single_pdf_path = run_dir / ("__".join(name_bits) + ".pdf")
                 single_title = f"{workbook_title} - {source_spec['subject']}"
-                WorkbookBuilder(run_dir / f"assets_{idx:02d}").build(single_title, [build_spec], single_pdf_path)
+                WorkbookBuilder(run_dir / f"assets_{idx:02d}", print_layout="duplex_facing" if print_layout.startswith("Duplex") else "single_sided").build(single_title, [build_spec], single_pdf_path)
                 separate_pdf_paths.append(single_pdf_path)
 
     st.success("Workbook generation complete.")
